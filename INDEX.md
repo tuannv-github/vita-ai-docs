@@ -61,6 +61,90 @@ Comprehensive source code architecture documentation including:
 - Design patterns and extension points
 - Performance considerations
 
+### 🔧 [PREPROCESSING_LAYER.md](PREPROCESSING_LAYER.md) - Preprocessing Layer Documentation
+Detailed documentation of the VITA-1.5 preprocessing layer including:
+- Text tokenization implementation with special tokens
+- Image processing pipeline (resize, normalize, aspect ratio)
+- Audio preprocessing (mel-spectrograms, resampling)
+- Video frame extraction and temporal sampling
+- Real-time audio/video processing from WebSocket streams
+- Input validation and token count verification
+- Output formats and data type specifications
+- Performance considerations and memory management
+
+### 🧠 [ENCODER_LAYER.md](ENCODER_LAYER.md) - Encoder Layer Documentation
+Comprehensive documentation of the VITA-1.5 encoder layer including:
+- Vision Encoder (InternViT-300M) architecture and implementation
+- Audio Encoder (Whale ASR) with Conformer-based processing
+- Patch embedding and positional encoding for vision
+- Mel-spectrogram processing and attention mechanisms for audio
+- Encoder integration and builder functions
+- Input/output specifications and data flow
+- Performance characteristics and memory usage
+- Practical examples with real data shapes and processing steps
+
+### 🔗 [PROJECTION_LAYER.md](PROJECTION_LAYER.md) - Projection Layer Documentation
+Detailed documentation of the VITA-1.5 projection layer including:
+- Vision Projector with multiple types (MLP, SPP, LDP, MiniGPT)
+- Audio Projector with adapter integration
+- Dimension alignment from encoder to LLM embedding space
+- Spatial and temporal feature processing
+- Projector type comparison and performance analysis
+- Input/output specifications and data transformations
+- Memory usage and inference time characteristics
+- Complete pipeline examples with feature analysis
+
+### 🏗️ [NETWORK_ARCHITECTURE.md](NETWORK_ARCHITECTURE.md) - Network Architecture Documentation
+Comprehensive documentation of the VITA-1.5 network architecture including:
+- Vision Encoder (InternViT-300M) detailed architecture and components
+- Audio Encoder (Whale ASR) with Conformer-based processing
+- Language Model (Qwen2-7B) transformer architecture
+- Projector architectures (MLP, SPP, CNN adapters)
+- Complete network integration and data flow
+- Component-wise parameter counts and computational complexity
+- Memory usage and performance analysis
+- Architecture diagrams and scalability considerations
+
+### 🧠 [LANGUAGE_MODEL_LAYER.md](LANGUAGE_MODEL_LAYER.md) - Language Model Layer Documentation
+Detailed documentation of the VITA-1.5 language model layer including:
+- Qwen2-7B transformer architecture and components
+- Multimodal input processing and token replacement
+- Text, vision, and audio embedding integration
+- Generation process and TTS integration
+- Input/output specifications with detailed examples
+- Performance characteristics and computational complexity
+- Practical examples for text-only and multimodal generation
+- Complete pipeline examples with real data processing
+
+### 🔄 [MODEL_INFERENCE_PIPELINE.md](MODEL_INFERENCE_PIPELINE.md) - Model Inference Pipeline
+Detailed documentation of the VITA model inference pipeline including:
+- Complete pipeline architecture with source code references
+- Multimodal input processing (text, image, audio, video)
+- Encoder and projector components
+- Language model integration
+- TTS generation pipeline
+- Performance optimization strategies
+- Configuration options and best practices
+
+### 📊 [VITA_INFERENCE_PIPELINE_DIAGRAM.md](VITA_INFERENCE_PIPELINE_DIAGRAM.md) - Visual Pipeline Diagrams
+Visual representation of the VITA inference pipeline including:
+- High-level architecture diagrams
+- Detailed component flow charts
+- Data flow visualization
+- Memory and performance optimization flows
+- Error handling and recovery mechanisms
+
+### 🌐 [WEB_DEMO_SERVER.md](WEB_DEMO_SERVER.md) - Web Demo Server
+Complete documentation of the VITA-1.5 web demo server implementation:
+- Real-time multimodal interaction system
+- WebSocket-based communication architecture
+- Multiprocessing worker system (LLM + TTS)
+- Voice Activity Detection (VAD) integration
+- Audio/video processing pipeline
+- Session management and user handling
+- Performance optimization and deployment
+
+
 ## 🎯 Quick Navigation
 
 ### For New Users
@@ -76,8 +160,10 @@ Comprehensive source code architecture documentation including:
 ### For Developers
 1. Read [DEVELOPMENT.md](DEVELOPMENT.md) for development setup
 2. Study [ARCHITECTURE.md](ARCHITECTURE.md) for code structure
-3. Follow contributing guidelines in [DEVELOPMENT.md](DEVELOPMENT.md)
-4. Use [USAGE_GUIDE.md](USAGE_GUIDE.md) for integration examples
+3. Review [MODEL_INFERENCE_PIPELINE.md](MODEL_INFERENCE_PIPELINE.md) for pipeline understanding
+4. Check [WEB_DEMO_SERVER.md](WEB_DEMO_SERVER.md) for server implementation
+5. Follow contributing guidelines in [DEVELOPMENT.md](DEVELOPMENT.md)
+6. Use [USAGE_GUIDE.md](USAGE_GUIDE.md) for integration examples
 
 ### For Evaluators
 1. Start with [EVALUATION.md](EVALUATION.md) for benchmark setup
@@ -163,6 +249,12 @@ We welcome contributions to improve the documentation:
 - **v1.1**: Added evaluation guide and development documentation
 - **v1.2**: Enhanced usage examples and troubleshooting
 - **v1.3**: Added comprehensive source code architecture documentation
+- **v1.4**: Added detailed model inference pipeline documentation with visual diagrams
+- **v1.5**: Added web demo server implementation documentation
+- **v1.6**: Added comprehensive preprocessing layer documentation
+- **v1.7**: Added detailed encoder layer and projection layer documentation
+- **v1.8**: Added comprehensive network architecture documentation for all ML components
+- **v1.9**: Added detailed language model layer documentation with input/output examples
 
 ### Model Versions
 - **VITA-1.0**: First open-source interactive omni multimodal LLM
@@ -173,5 +265,5 @@ We welcome contributions to improve the documentation:
 **Note**: This documentation is actively maintained and updated. For the latest information, always refer to the most recent version of the documentation files.
 
 **Last Updated**: January 2025  
-**Documentation Version**: 1.3  
+**Documentation Version**: 1.5  
 **Model Version**: VITA-1.5
