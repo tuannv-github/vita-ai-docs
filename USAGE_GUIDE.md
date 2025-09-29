@@ -63,31 +63,32 @@ print(response)
 
 #### Text Query
 ```bash
-CUDA_VISIBLE_DEVICES=0 python video_audio_demo.py \
-    --model_path /path/to/vita-1.5 \
+CUDA_VISIBLE_DEVICES=2 python video_audio_demo.py \
+    --model_path [vita/path] \
+    --image_path asset/vita_newlog.jpg \
     --model_type qwen2p5_instruct \
     --conv_mode qwen2p5_instruct \
-    --question "Explain quantum computing in simple terms."
+    --question "Describe this image."
 ```
 
-#### Image Analysis
+#### Audio Query
 ```bash
-CUDA_VISIBLE_DEVICES=0 python video_audio_demo.py \
-    --model_path /path/to/vita-1.5 \
-    --image_path /path/to/image.jpg \
+CUDA_VISIBLE_DEVICES=4 python video_audio_demo.py \
+    --model_path [vita/path] \
+    --image_path asset/vita_newlog.png \
     --model_type qwen2p5_instruct \
     --conv_mode qwen2p5_instruct \
-    --question "What objects can you identify in this image?"
+    --audio_path asset/q1.wav
 ```
 
-#### Audio Transcription
+#### Noisy Audio Query
 ```bash
-CUDA_VISIBLE_DEVICES=0 python video_audio_demo.py \
-    --model_path /path/to/vita-1.5 \
-    --audio_path /path/to/audio.wav \
+CUDA_VISIBLE_DEVICES=4 python video_audio_demo.py \
+    --model_path [vita/path] \
+    --image_path asset/vita_newlog.png \
     --model_type qwen2p5_instruct \
     --conv_mode qwen2p5_instruct \
-    --question "Transcribe the audio content."
+    --audio_path asset/q2.wav
 ```
 
 ### Python API

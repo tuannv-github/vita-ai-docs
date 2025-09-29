@@ -1,8 +1,5 @@
 # VITA-1.5 Documentation
 
-> **⚠️ WARNING:**  
-> This document is generated autonomouly by Cusor Agent
-
 Welcome to the comprehensive documentation for VITA-1.5, an advanced Vision-Language-Audio-Action (VLAA) multimodal large language model that enables real-time interactive communication across multiple modalities.
 
 ## 📋 Table of Contents
@@ -29,6 +26,8 @@ VITA-1.5 is a state-of-the-art multimodal large language model that supports rea
 - **📈 Enhanced Multimodal Performance**: Average performance on benchmarks increased from 59.8 to 70.8
 - **🎤 Improved Speech Processing**: ASR WER reduced from 18.4 to 7.5 with end-to-end TTS module
 - **🔄 Progressive Training Strategy**: Minimal impact on vision-language performance when adding speech
+- **🌟 ModelScope Integration**: Official demo now available on ModelScope platform
+- **📊 VLMEvalKit Support**: Full integration with OpenCompass evaluation framework
 
 ## ✨ Key Features
 
@@ -74,7 +73,7 @@ Download the required model weights:
 
 ### Text Query Example
 
-```python
+```bash
 CUDA_VISIBLE_DEVICES=2 python video_audio_demo.py \
     --model_path [vita/path] \
     --image_path asset/vita_newlog.jpg \
@@ -85,13 +84,24 @@ CUDA_VISIBLE_DEVICES=2 python video_audio_demo.py \
 
 ### Audio Query Example
 
-```python
+```bash
 CUDA_VISIBLE_DEVICES=4 python video_audio_demo.py \
     --model_path [vita/path] \
     --image_path asset/vita_newlog.png \
     --model_type qwen2p5_instruct \
     --conv_mode qwen2p5_instruct \
     --audio_path asset/q1.wav
+```
+
+### Noisy Audio Query Example
+
+```bash
+CUDA_VISIBLE_DEVICES=4 python video_audio_demo.py \
+    --model_path [vita/path] \
+    --image_path asset/vita_newlog.png \
+    --model_type qwen2p5_instruct \
+    --conv_mode qwen2p5_instruct \
+    --audio_path asset/q2.wav
 ```
 
 ## 📖 Usage Examples
@@ -117,6 +127,8 @@ cp -rf vllm_file/* your_anaconda/envs/vita_demo/lib/python3.10/site-packages/vll
 python -m web_demo.web_ability_demo demo_VITA_ckpt/
 ```
 
+**Note**: VITA has been accelerated using [vLLM](https://github.com/vllm-project/vllm). Since VITA has not yet been integrated into vLLM, you need to make some modifications to the vLLM code to adapt it for VITA.
+
 ### Real-Time Interactive Demo
 
 For real-time interaction:
@@ -131,6 +143,11 @@ pip install flask==3.1.0 flask-socketio==5.5.0 cryptography==44.0.0 timm==1.0.12
 # Configure for real-time (set max_dynamic_patch to 1 in config.json)
 python -m web_demo.server --model_path demo_VITA_ckpt --ip 0.0.0.0 --port 8081
 ```
+
+**Important Notes**:
+- Make sure you have executed the basic demo setup instructions first
+- For better real-time interactive experience, set `max_dynamic_patch` to 1 in `demo_VITA_ckpt/config.json`
+- When running the basic demo, you can set it to the default value of 12 to enhance the model's visual capabilities
 
 ## 🔧 API Reference
 
@@ -173,6 +190,10 @@ vita_series = {
     'vita_qwen2': partial(VITAQwen2, model_path='/path/to/model'),
 }
 
+# Follow the instructions in VLMEvalKit to set the GPT as the judge model
+# If OpenAI API is not available, you can use a local model as judge
+# For example, Qwen1.5-1.8B-Chat works well compared to GPT-4, except in MM-Vet
+
 # Run evaluation
 CUDA_VISIBLE_DEVICES=0 python run.py --data MMBench_TEST_EN_V11 MMBench_TEST_CN_V11 MMStar MMMU_DEV_VAL MathVista_MINI HallusionBench AI2D_TEST OCRBench MMVet MME --model vita_qwen2 --verbose
 ```
@@ -189,6 +210,11 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 OUTPUT_DIR=/path/to/output
 bash script/train/finetuneTaskNeg_qwen_nodes.sh ${OUTPUT_DIR}
 ```
+
+**Required Downloads**:
+- [VITA-1.5 checkpoint](https://huggingface.co/VITA-MLLM/VITA-1.5/tree/main)
+- [InternViT-300M-448px](https://huggingface.co/OpenGVLab/InternViT-300M-448px)
+- [Audio encoder](https://huggingface.co/VITA-MLLM/VITA-1.5/tree/main/audio-encoder-Qwen2-7B-1107-weight-base-11wh-tunning)
 
 ### Data Preparation
 
@@ -263,6 +289,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Video**: [VITA-1.5 Demo Show](https://youtu.be/tyi6SVFT5mM?si=fkMQCrwa5fVnmEe7)
 - **VITA-1.0**: [Previous Version](https://vita-home.github.io/)
 - **WeChat Group**: [Join Discussion](./asset/wechat-group.jpg)
+- **GitHub Repository**: [VITA-MLLM/VITA](https://github.com/VITA-MLLM/VITA)
+- **Hugging Face**: [VITA-MLLM/VITA-1.5](https://huggingface.co/VITA-MLLM/VITA-1.5)
 
 ## 🙏 Acknowledgments
 

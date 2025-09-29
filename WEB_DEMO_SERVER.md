@@ -8,6 +8,11 @@ This document provides comprehensive documentation for the VITA-1.5 web demo ser
 - [Architecture](#architecture)
 - [Data Flow Diagram](#data-flow-diagram)
 - [Core Components](#core-components)
+  - [LLM Generation and Output Collection](#llm-generation-and-output-collection-details)
+  - [Understanding Logits and Conversion to Text/Audio](#understanding-logits-and-conversion-to-textaudio)
+  - [Tokenization Process](#tokenization-process)
+  - [Conversation History Management](#conversation-history-management)
+  - [Voice Activity Detection (VAD) System](#voice-activity-detection-vad-system)
 - [Client-Side Audio and Image Streaming](#client-side-audio-and-image-streaming)
 - [Data Transmission Timing](#data-transmission-timing)
 - [WebSocket Events](#websocket-events)
@@ -489,6 +494,903 @@ def load_model(
             asyncio.set_event_loop(loop)
             results = loop.run_until_complete(collect_results(llm_output))
 ```
+
+#### LLM Generation and Output Collection Details
+
+The VITA server uses **vLLM** (a high-performance LLM inference engine) for model serving. Here's a detailed breakdown of how `llm.generate` works and how model output is collected:
+
+##### 1. **LLM Initialization**
+```python
+# File: web_demo/server.py:189-198
+llm = LLM(
+    model=engine_args,  # Path to the VITA model
+    dtype="float16",
+    tensor_parallel_size=1,
+    trust_remote_code=True,
+    gpu_memory_utilization=0.85,
+    disable_custom_all_reduce=True,
+    limit_mm_per_prompt={'image':256,'audio':50},  # Limits for multimodal inputs
+)
+```
+
+##### 2. **Sampling Parameters Configuration**
+```python
+# File: web_demo/server.py:203
+sampling_params = SamplingParams(
+    temperature=0.001,  # Very low temperature for deterministic output
+    max_tokens=512,     # Maximum tokens to generate
+    best_of=1,          # Number of sequences to generate
+    skip_special_tokens=False  # Keep special tokens in output
+)
+```
+
+##### 3. **Input Processing Pipeline**
+Before calling `llm.generate`, inputs go through extensive preprocessing:
+
+1. **Multimodal Data Processing**: Images, audio, and video are processed and converted to appropriate formats
+2. **Tokenization**: The prompt is tokenized with special tokens for images (`<image>`) and audio (`<audio>`)
+3. **History Merging**: Previous conversation history is merged with the current request
+4. **Prompt Construction**: System prompts and conversation format are applied
+
+##### 4. **LLM Generation Call**
+```python
+# File: web_demo/server.py:382-384
+output = llm.generate(inputs, sampling_params=sampling_params)
+```
+
+**Key Points:**
+- `inputs` contains the processed multimodal data and tokenized prompt
+- The `prompt` field is removed before generation (only `prompt_token_ids` and `multi_modal_data` remain)
+- vLLM handles the actual inference using the VITA model
+
+##### 5. **Output Collection and Processing**
+
+###### **Understanding `output[0].outputs[0].text`**
+
+The vLLM `generate()` method returns a complex nested structure. Here's the breakdown:
+
+```python
+# File: web_demo/server.py:382-389
+output = llm.generate(inputs, sampling_params=sampling_params)
+llm_output = output[0].outputs[0].text
+```
+
+**Data Structure Explanation:**
+```python
+# vLLM output structure:
+output = [
+    RequestOutput(  # output[0] - First (and only) request
+        request_id="req_123",
+        prompt="<|im_start|>user\nHello<|im_end|>\n<|im_start|>assistant\n",
+        prompt_token_ids=[1, 2, 3, ...],
+        outputs=[  # outputs - List of generated sequences
+            CompletionOutput(  # outputs[0] - First completion
+                index=0,
+                text="Hello! How can I help you today?",  # .text - The actual generated text
+                token_ids=[4, 5, 6, ...],
+                cumulative_logprob=0.0,
+                logprobs=None,
+                finish_reason="stop"
+            )
+        ],
+        finished=True
+    )
+]
+```
+
+**Toy Example:**
+```python
+# Example vLLM response structure
+output = [
+    RequestOutput(
+        request_id="req_001",
+        prompt="<|im_start|>user\nWhat is AI?<|im_end|>\n<|im_start|>assistant\n",
+        outputs=[
+            CompletionOutput(
+                index=0,
+                text="AI, or Artificial Intelligence, is a branch of computer science that focuses on creating intelligent machines capable of performing tasks that typically require human intelligence.",
+                token_ids=[151, 44, 12, 8, 25, ...],
+                finish_reason="stop"
+            )
+        ]
+    )
+]
+
+# Extracting the text:
+generated_text = output[0].outputs[0].text
+# Result: "AI, or Artificial Intelligence, is a branch of computer science..."
+```
+
+###### **Immediate Output Extraction**
+```python
+# File: web_demo/server.py:389-392
+llm_output = output[0].outputs[0].text
+print(f"LLM ouput: {llm_output}")
+# First sentence mark
+llm_output = '$$FIRST_SENTENCE_MARK$$' + llm_output
+```
+
+The output is extracted from the vLLM response structure and marked for first sentence processing.
+
+###### **Streaming Results Processing**
+The server includes a `stream_results` function for streaming generation:
+
+```python
+# File: web_demo/server.py:327-334
+async def stream_results(results_generator) -> AsyncGenerator[bytes, None]:
+    previous_text = ""
+    async for request_output in results_generator:
+        text = request_output.outputs[0].text
+        newly_generated_text = text[len(previous_text):]
+        previous_text = text
+        yield newly_generated_text
+```
+
+###### **Async Mechanism and Character-by-Character Processing**
+
+The server uses an async mechanism to process the generated text character by character. Here's how it works:
+
+**Async Setup:**
+```python
+# File: web_demo/server.py:488-490
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+results = loop.run_until_complete(collect_results(llm_output))
+```
+
+**Why Async?**
+- **Non-blocking Processing**: Allows other operations to continue while processing text
+- **Real-time Streaming**: Enables immediate TTS processing as text is generated
+- **Interruption Handling**: Can be stopped mid-processing if needed
+
+**Toy Example - Async Processing Flow:**
+```python
+# Simulated character-by-character processing
+llm_output = "Hello, how are you today?"
+
+async def collect_results_example(text):
+    results = []
+    history_text = ''
+    
+    for char in text:  # Process each character
+        print(f"Processing character: '{char}'")
+        
+        # Add to history
+        history_text += char
+        
+        # Check for punctuation (trigger TTS)
+        if char in [",", ".", "?", "!"]:
+            print(f"Punctuation found! Sending to TTS: '{history_text}'")
+            # In real code: outputs_queue.put({"id": llm_id, "response": history_text})
+            history_text = ''  # Reset for next segment
+        
+        results.append(char)
+    
+    return results
+
+# Run the async function
+import asyncio
+results = asyncio.run(collect_results_example("Hello, how are you today?"))
+```
+
+**Character-by-Character Processing:**
+```python
+# File: web_demo/server.py:394-427
+async def collect_results(llm_output):
+    results = []
+    is_first_time_to_work = True
+    history_generated_text = ''
+    
+    for newly_generated_text in llm_output:
+        # is_negative = judge_negative(newly_generated_text)
+        is_negative = False
+
+        if not is_negative:
+            history_generated_text += newly_generated_text
+            if is_first_time_to_work:
+                print(f"Process {cuda_devices} is starting work")
+                stop_event.clear()
+                clear_queue(outputs_queue)
+                clear_queue(tts_outputs_queue)
+                is_first_time_to_work = False
+
+            if not stop_event.is_set():
+                results.append(newly_generated_text)
+                history_generated_text = history_generated_text.replace('☞ ', '').replace('☞', '')                            
+                if newly_generated_text in [",", "，", ".", "。", "?", "\n", "？", "!", "！", "、"]:
+                    outputs_queue.put({"id": llm_id, "response": history_generated_text})
+                    history_generated_text = ''
+            else:
+                print(f"Process {cuda_devices} is interrupted.")
+                break
+        else:
+            print(f"Process {cuda_devices} is generating negative text.")
+            break
+    
+    current_inputs["response"] = "".join(results)
+    if not current_inputs["response"] == "":
+        global_history.append(current_inputs)
+    return results
+```
+
+**Toy Example - Complete Processing Flow:**
+```python
+# Simulated complete processing with toy data
+def simulate_llm_processing():
+    # 1. LLM generates text
+    llm_output = "Hello, I'm Vita! How can I help you today?"
+    
+    # 2. Add first sentence marker
+    llm_output = '$$FIRST_SENTENCE_MARK$$' + llm_output
+    
+    # 3. Process character by character
+    results = []
+    history_text = ''
+    tts_segments = []
+    
+    for char in llm_output:
+        history_text += char
+        
+        # Remove special tokens
+        if char in ['☞', '☟']:
+            continue
+            
+        results.append(char)
+        
+        # Check for punctuation (trigger TTS)
+        if char in [",", ".", "!", "?"]:
+            tts_segments.append(history_text.strip())
+            print(f"TTS Segment: '{history_text.strip()}'")
+            history_text = ''
+    
+    print(f"Final result: {''.join(results)}")
+    print(f"TTS Segments: {tts_segments}")
+    
+    return results, tts_segments
+
+# Run simulation
+results, tts_segments = simulate_llm_processing()
+```
+
+**Key Async Benefits:**
+1. **Real-time Processing**: Text is processed as it's generated
+2. **TTS Integration**: Punctuation triggers immediate TTS processing
+3. **Interruption Support**: Can be stopped mid-processing
+4. **Queue Management**: Efficient communication with TTS worker
+5. **History Management**: Maintains conversation context
+
+###### **Streaming vs Non-Streaming Generation**
+
+The VITA server supports both streaming and non-streaming generation modes:
+
+**Non-Streaming Mode (Current Implementation):**
+```python
+# File: web_demo/server.py:382-384
+output = llm.generate(inputs, sampling_params=sampling_params)
+llm_output = output[0].outputs[0].text  # Complete text at once
+```
+
+**Streaming Mode (Available but not used):**
+```python
+# File: web_demo/server.py:327-334
+async def stream_results(results_generator) -> AsyncGenerator[bytes, None]:
+    previous_text = ""
+    async for request_output in results_generator:
+        text = request_output.outputs[0].text
+        newly_generated_text = text[len(previous_text):]
+        previous_text = text
+        yield newly_generated_text
+```
+
+**Toy Example - Streaming vs Non-Streaming:**
+```python
+# Non-streaming: Get complete response at once
+def non_streaming_example():
+    output = llm.generate(inputs, sampling_params=sampling_params)
+    complete_text = output[0].outputs[0].text
+    print(f"Complete response: {complete_text}")
+    # Process entire text at once
+    return complete_text
+
+# Streaming: Get text incrementally
+async def streaming_example():
+    results_generator = llm.generate(inputs, sampling_params=sampling_params, stream=True)
+    previous_text = ""
+    
+    async for request_output in results_generator:
+        current_text = request_output.outputs[0].text
+        new_text = current_text[len(previous_text):]
+        previous_text = current_text
+        
+        print(f"New text chunk: '{new_text}'")
+        # Process each chunk immediately
+        
+        # Trigger TTS on punctuation
+        if new_text in [",", ".", "!", "?"]:
+            print(f"TTS trigger: '{current_text}'")
+    
+    return previous_text
+
+# Comparison
+print("Non-streaming: Wait for complete response, then process")
+print("Streaming: Process text as it's generated, better for real-time TTS")
+```
+
+**Why Non-Streaming is Used:**
+- **Simplicity**: Easier to implement and debug
+- **Consistency**: Predictable output format
+- **Error Handling**: Better error recovery
+- **TTS Integration**: Character-by-character processing provides similar real-time benefits
+
+###### **Understanding Logits and Conversion to Text/Audio**
+
+**What are Logits?**
+Logits are raw, unnormalized probability scores that the model outputs for each possible token in the vocabulary. They represent the model's confidence for each possible next token.
+
+**Logits to Text Conversion Process:**
+
+```python
+# File: web_demo/server.py:82 (from vita_qwen2.py)
+hidden_states = outputs[0]  # Hidden states from transformer layers
+logits = self.lm_head(hidden_states)  # Linear projection to vocab size
+```
+
+**Step-by-Step Conversion:**
+
+1. **Hidden States → Logits:**
+```python
+# File: vita/model/language_model/vita_qwen2.py:82-83
+hidden_states = outputs[0]  # Shape: [batch_size, seq_len, hidden_size]
+logits = self.lm_head(hidden_states)  # Shape: [batch_size, seq_len, vocab_size]
+```
+
+2. **Logits → Probabilities:**
+```python
+# Apply softmax to convert logits to probabilities
+import torch.nn.functional as F
+probabilities = F.softmax(logits, dim=-1)  # Shape: [batch_size, seq_len, vocab_size]
+```
+
+3. **Probabilities → Token Selection:**
+```python
+# Greedy decoding (select highest probability token)
+next_token_id = torch.argmax(probabilities, dim=-1)  # Shape: [batch_size, seq_len]
+
+# Or sampling with temperature
+temperature = 0.001  # Low temperature for deterministic output
+scaled_logits = logits / temperature
+probabilities = F.softmax(scaled_logits, dim=-1)
+next_token_id = torch.multinomial(probabilities, num_samples=1)
+```
+
+4. **Token IDs → Text:**
+```python
+# Convert token IDs back to text using tokenizer
+generated_text = tokenizer.decode(next_token_id, skip_special_tokens=True)
+```
+
+**Toy Example - Complete Logits to Text Flow:**
+```python
+def simulate_logits_to_text():
+    # 1. Model outputs logits for vocabulary
+    vocab_size = 50000  # Example vocabulary size
+    seq_len = 1  # Generating one token at a time
+    batch_size = 1
+    
+    # Simulate logits (raw scores for each token)
+    logits = torch.randn(batch_size, seq_len, vocab_size)
+    print(f"Logits shape: {logits.shape}")
+    print(f"Sample logits: {logits[0, 0, :5]}")  # First 5 logits
+    
+    # 2. Convert to probabilities
+    probabilities = F.softmax(logits, dim=-1)
+    print(f"Probabilities shape: {probabilities.shape}")
+    print(f"Sum of probabilities: {probabilities.sum(dim=-1)}")  # Should be 1.0
+    
+    # 3. Select next token (greedy)
+    next_token_id = torch.argmax(probabilities, dim=-1)
+    print(f"Selected token ID: {next_token_id}")
+    
+    # 4. Convert to text (simplified)
+    # In real implementation: tokenizer.decode(next_token_id)
+    print(f"Generated token: {next_token_id.item()}")
+    
+    return next_token_id
+
+# Run simulation
+next_token = simulate_logits_to_text()
+```
+
+**Logits to Audio Conversion (TTS Process):**
+
+The VITA system uses a two-stage process for audio generation:
+
+1. **Text → Embeddings:**
+```python
+# File: web_demo/server.py:620
+embeddings = llm_embedding(torch.tensor(tokenizer.encode(tts_input_text)).to(device))
+```
+
+2. **Embeddings → Audio Tokens:**
+```python
+# File: vita/model/vita_tts/decoder/llm2tts.py:142-143
+for next_token_id in self.infer(hidden, top_k, prefix, penalty_window_size, penalty):
+    token = torch.cat([token, next_token_id], dim=-1)
+```
+
+3. **Audio Tokens → Audio Waveform:**
+```python
+# File: vita/model/vita_tts/decoder/llm2tts.py:145-147
+syn = self.codec_model.vqvae(token.unsqueeze(-1), 
+                             torch.tensor(self.codec_model.vqvae.h.global_tokens, 
+                             device=token.device).unsqueeze(0).unsqueeze(0))
+```
+
+**Toy Example - Audio Generation Flow:**
+```python
+def simulate_text_to_audio():
+    # 1. Text input
+    text = "Hello, how are you?"
+    print(f"Input text: {text}")
+    
+    # 2. Text → Token IDs
+    token_ids = tokenizer.encode(text)  # [101, 7592, 117, 1291, 1128, 136, 102]
+    print(f"Token IDs: {token_ids}")
+    
+    # 3. Token IDs → Embeddings
+    embeddings = model.get_input_embeddings()(torch.tensor(token_ids))
+    print(f"Embeddings shape: {embeddings.shape}")  # [seq_len, embedding_dim]
+    
+    # 4. Embeddings → Audio Tokens (simplified)
+    # In real TTS: LLM generates audio token logits
+    audio_token_logits = tts_model(embeddings)  # [seq_len, audio_vocab_size]
+    audio_tokens = torch.argmax(audio_token_logits, dim=-1)
+    print(f"Audio tokens: {audio_tokens}")
+    
+    # 5. Audio Tokens → Audio Waveform
+    audio_waveform = codec_model.decode(audio_tokens)
+    print(f"Audio waveform shape: {audio_waveform.shape}")  # [samples]
+    
+    return audio_waveform
+
+# Run simulation
+audio = simulate_text_to_audio()
+```
+
+**Key Differences:**
+
+| Process | Input | Output | Model Component |
+|---------|-------|--------|-----------------|
+| **Text Generation** | Hidden States | Text Logits | `lm_head` (Linear layer) |
+| **Audio Generation** | Text Embeddings | Audio Token Logits | TTS LLM + Codec |
+| **Text Decoding** | Text Logits | Token IDs | `argmax` or sampling |
+| **Audio Decoding** | Audio Tokens | Waveform | VQ-VAE Codec |
+
+**Sampling Parameters in VITA:**
+```python
+# File: web_demo/server.py:203
+sampling_params = SamplingParams(
+    temperature=0.001,  # Very low = deterministic
+    max_tokens=512,     # Maximum generation length
+    best_of=1,          # Number of sequences to generate
+    skip_special_tokens=False  # Keep special tokens
+)
+```
+
+**Why Low Temperature (0.001)?**
+- **Deterministic Output**: Low temperature makes the model more confident in its predictions
+- **Consistent Responses**: Reduces randomness in generated text
+- **Better for TTS**: More predictable text leads to better audio generation
+- **Real-time Performance**: Faster processing with greedy decoding
+
+##### 6. **Output Flow Architecture**
+
+The collected output flows through multiple stages:
+
+1. **LLM Generation** → Raw text output
+2. **Character Processing** → Individual characters with punctuation detection
+3. **TTS Queue** → Text segments sent to Text-to-Speech worker
+4. **Audio Generation** → TTS worker converts text to audio
+5. **WebSocket Streaming** → Audio data sent to client in real-time
+
+##### 7. **Key Features**
+
+- **Real-time Streaming**: Text is processed character-by-character and sent to TTS as soon as punctuation is encountered
+- **Interruption Handling**: The generation can be stopped via `stop_event`
+- **Multimodal Support**: Handles images, audio, and video inputs through special token processing
+- **History Management**: Maintains conversation context across multiple turns
+- **Queue-based Architecture**: Uses multiprocessing queues for communication between LLM and TTS workers
+
+##### 8. **Performance Monitoring**
+
+The server tracks generation timing:
+```python
+# File: web_demo/server.py:381-387
+llm_start_time = time.time()
+output = llm.generate(inputs, sampling_params=sampling_params)
+llm_end_time = time.time()
+print(f"[DEBUG] Worker {llm_id}: LLM generation completed")
+print(f"{Colors.GREEN}LLM process time: {llm_end_time - llm_start_time}{Colors.RESET}")
+```
+
+This architecture enables real-time multimodal conversation with the VITA model, where text generation, TTS conversion, and audio streaming happen concurrently for a responsive user experience.
+
+#### Tokenization Process
+
+The VITA server implements a sophisticated tokenization system for handling multimodal inputs. Here's how it works:
+
+##### 1. **Multimodal Token Processing**
+```python
+# File: web_demo/server.py:127-153
+def tokenizer_image_audio_token(prompt, tokenizer, image_token_index=IMAGE_TOKEN_INDEX, audio_token_index=AUDIO_TOKEN_INDEX, return_tensors=None):
+    """
+    Tokenize prompt with special tokens for images and audio.
+    
+    Args:
+        prompt (str): Input prompt containing <image> and <audio> tokens
+        tokenizer: HuggingFace tokenizer
+        image_token_index (int): Token index for images (51000)
+        audio_token_index (int): Token index for audio (51001)
+        return_tensors (str): Tensor format ('pt' for PyTorch)
+        
+    Returns:
+        list or torch.Tensor: Tokenized input IDs
+    """
+    prompt_chunks = []
+    for chunk in re.split(r'(<audio>|<image>)', prompt):
+        if chunk == '<audio>':
+            prompt_chunks.append([audio_token_index])
+        elif chunk == '<image>':
+            prompt_chunks.append([image_token_index])
+        else:
+            prompt_chunks.append(tokenizer(chunk).input_ids)
+    
+    input_ids = []
+    offset = 0
+    if len(prompt_chunks) > 0 and len(prompt_chunks[0]) > 0 and prompt_chunks[0][0] == tokenizer.bos_token_id:
+        offset = 1
+        input_ids.append(prompt_chunks[0][0])
+
+    for x in prompt_chunks:
+        if x != [image_token_index] and x != [audio_token_index]:
+            input_ids.extend(x[offset:])
+        else:
+            input_ids.extend(x[:])
+
+    if return_tensors is not None:
+        if return_tensors == 'pt':
+            return torch.LongTensor(input_ids)
+        raise ValueError(f'Unsupported tensor type: {return_tensors}')
+    return input_ids
+```
+
+##### 2. **Token Constants**
+```python
+# File: web_demo/server.py:61-65
+IMAGE_TOKEN_INDEX = 51000  # Special token index for images
+AUDIO_TOKEN_INDEX = 51001  # Special token index for audio
+IMAGE_TOKEN = "<image>"    # Image token string
+AUDIO_TOKEN = "<audio>"    # Audio token string
+VIDEO_TOKEN = "<video>"    # Video token string
+```
+
+##### 3. **Token Processing Flow**
+
+1. **Prompt Parsing**: The prompt is split using regex to identify `<image>` and `<audio>` tokens
+2. **Token Replacement**: Special tokens are replaced with their corresponding token indices
+3. **BOS Token Handling**: Beginning-of-sequence tokens are properly handled
+4. **Tensor Conversion**: Final token IDs can be converted to PyTorch tensors
+
+##### 4. **Multimodal Input Validation**
+```python
+# File: web_demo/server.py:274-295
+# Validate image token count matches input count
+if "prompt" in inputs:
+    assert inputs["prompt"].count(IMAGE_TOKEN) == len(image_inputs), \
+        f"Number of image token {IMAGE_TOKEN} in prompt must match the number of image inputs."
+
+# Validate audio token count matches input count  
+if "prompt" in inputs:
+    assert inputs["prompt"].count(AUDIO_TOKEN) == len(inputs["multi_modal_data"]["audio"]), \
+        f"Number of audio token {AUDIO_TOKEN} in prompt must match the number of audio inputs."
+```
+
+##### 5. **Video Token Processing**
+```python
+# File: web_demo/server.py:310-318
+# Convert video to image frames and replace video token with image tokens
+video_frames_inputs = []
+for video_input in video_inputs:
+    video_frames_inputs.extend(_process_video(video_input, max_frames=4, min_frames=4))
+
+# Replace video token with multiple image tokens
+inputs["prompt"] = inputs["prompt"].replace(VIDEO_TOKEN, IMAGE_TOKEN * len(video_frames_inputs))
+if "image" not in inputs["multi_modal_data"]:
+    inputs["multi_modal_data"]["image"] = []
+inputs["multi_modal_data"]["image"].extend(video_frames_inputs)
+```
+
+##### 6. **Token Processing in LLM Worker**
+```python
+# File: web_demo/server.py:421-432
+# Process prompt tokens
+if "prompt" in inputs:
+    inputs["prompt_token_ids"] = tokenizer_image_audio_token(
+        inputs["prompt"], tokenizer, 
+        image_token_index=IMAGE_TOKEN_INDEX, 
+        audio_token_index=AUDIO_TOKEN_INDEX
+    )
+else:
+    assert "prompt_token_ids" in inputs, "Either 'prompt' or 'prompt_token_ids' must be provided."
+
+print(f"Process {cuda_devices} is processing inputs: {inputs}")
+inputs.pop("prompt", None)  # Remove prompt string, keep only token IDs
+```
+
+This tokenization system ensures that multimodal inputs (images, audio, video) are properly integrated into the language model's input sequence, enabling the VITA model to process and understand multiple modalities simultaneously.
+
+#### Conversation History Management
+
+The VITA server implements a sophisticated conversation history system that maintains context across multiple turns:
+
+##### 1. **History Merging Function**
+```python
+# File: web_demo/server.py:642-718
+def merge_current_and_history(
+    global_history,
+    current_request,
+    skip_history_vision=False,
+    move_image_token_to_start=False
+):
+    """
+    Merge conversation history with current request.
+    
+    Args:
+        global_history (list): Previous conversation turns
+        current_request (dict): Current user request
+        skip_history_vision (bool): Skip vision data in history
+        move_image_token_to_start (bool): Move image tokens to prompt start
+        
+    Returns:
+        dict: Merged request with conversation context
+    """
+    
+    system_prompts = {
+        "video": "<|im_start|>system\nYou are an AI robot and your name is Vita...",
+        "image": "<|im_start|>system\nYou are an AI robot and your name is Vita...",
+        "audio": "<|im_start|>system\nYou are an AI robot and your name is Vita..."
+    }
+    
+    def select_system_prompt(current_request):
+        if "multi_modal_data" in current_request:
+            if "video" in current_request["multi_modal_data"]:
+                return system_prompts["video"]
+            elif "image" in current_request["multi_modal_data"]:
+                return system_prompts["video"]  # Use video prompt for images
+            elif "audio" in current_request["multi_modal_data"]:
+                return system_prompts["audio"]
+        return system_prompts["audio"]
+    
+    system_prompt = select_system_prompt(current_request)
+    user_prefix = "<|im_start|>user\n"
+    bot_prefix = "<|im_start|>assistant\n"
+    eos = "<|im_end|>\n"
+    
+    # Handle first conversation turn
+    if len(global_history) == 0:
+        current_request["prompt"] = (system_prompt + user_prefix + current_request["prompt"] + eos + bot_prefix)
+        return current_request
+    
+    # Build conversation context
+    current_prompt = system_prompt
+    current_multi_modal_data = {"image": [], "audio": [], "video": []}
+    
+    # Add history to current prompt
+    for history in global_history:
+        assert "prompt" in history, "Prompt must be provided in history."
+        assert "response" in history, "Response must be provided in history."
+        
+        if skip_history_vision:
+            history_prompt = history["prompt"].replace(IMAGE_TOKEN, "").replace(VIDEO_TOKEN, "")
+        else:
+            history_prompt = history["prompt"]
+            
+        history_prompt = user_prefix + history_prompt + eos + bot_prefix + history["response"] + eos
+        
+        # Collect multimodal data from history
+        for modality in ["image", "audio", "video"]:
+            if skip_history_vision and modality in ["image", "video"]:
+                continue
+            if "multi_modal_data" in history and modality in history["multi_modal_data"]:
+                current_multi_modal_data[modality].extend(history["multi_modal_data"][modality])
+        current_prompt += history_prompt
+    
+    # Add current request
+    current_prompt += user_prefix + current_request["prompt"] + eos + bot_prefix
+    for modality in ["image", "audio", "video"]:
+        if "multi_modal_data" in current_request and modality in current_request["multi_modal_data"]:
+            current_multi_modal_data[modality].extend(current_request["multi_modal_data"][modality])
+    
+    # Clean up empty modalities
+    for modality in ["image", "audio", "video"]:
+        if current_multi_modal_data[modality] == []:
+            current_multi_modal_data.pop(modality, None)
+    
+    # Move image tokens to start if requested
+    if move_image_token_to_start:
+        num_image_tokens = current_prompt.count(IMAGE_TOKEN)
+        current_prompt = current_prompt.replace(IMAGE_TOKEN, "")
+        current_prompt = current_prompt.replace(system_prompt, "")
+        current_prompt = system_prompt + user_prefix + IMAGE_TOKEN * num_image_tokens + current_prompt.replace(user_prefix,'')
+    
+    current_request["prompt"] = current_prompt.replace('☞ ','☞').replace('☟ ','☟')
+    current_request["multi_modal_data"] = current_multi_modal_data
+    
+    return current_request
+```
+
+##### 2. **History Configuration**
+```python
+# File: web_demo/server.py:984-985
+global_history = manager.list()  # Shared conversation history
+global_history_limit = 1         # Number of previous turns to keep
+```
+
+##### 3. **History Update Process**
+```python
+# File: web_demo/server.py:424-427
+# Update global history after generation
+current_inputs["response"] = "".join(results)
+if not current_inputs["response"] == "":
+    global_history.append(current_inputs)
+```
+
+##### 4. **History Reset Function**
+```python
+# File: web_demo/server.py:922-927
+@socketio.on('reset_state')
+def handle_reset_state():
+    """Reset conversation history."""
+    global_history = current_app.config['GLOBAL_HISTORY']
+    while len(global_history) > 0:
+        global_history.pop()
+    print("Resetting the state")
+```
+
+##### 5. **Key Features**
+
+- **Context Preservation**: Maintains conversation context across multiple turns
+- **Multimodal History**: Preserves both text and multimodal data from previous interactions
+- **Configurable Limits**: Adjustable history length to balance context and performance
+- **Vision Skipping**: Option to skip vision data in history to reduce memory usage
+- **Token Management**: Proper handling of special tokens in conversation context
+- **System Prompts**: Dynamic system prompt selection based on input modality
+
+This history management system enables the VITA model to maintain coherent, context-aware conversations while efficiently managing memory and processing resources.
+
+#### Voice Activity Detection (VAD) System
+
+The VITA server implements a sophisticated Voice Activity Detection system for real-time audio processing:
+
+##### 1. **PCM Audio Processing**
+```python
+# File: web_demo/server.py:720-786
+def send_pcm(sid, request_inputs_queue):
+    """
+    Sends PCM audio data to the dialogue system for processing.
+    """
+    chunk_size = connected_users[sid][1].wakeup_and_vad.get_chunk_size()
+    
+    print(f"Sid: {sid} Start listening")
+    while True:
+        if connected_users[sid][1].stop_pcm:
+            print(f"Sid: {sid} Stop pcm")
+            connected_users[sid][1].stop_generate = True 
+            connected_users[sid][1].stop_tts = True
+            break
+            
+        time.sleep(0.01)
+        e = connected_users[sid][1].pcm_fifo_queue.get(chunk_size)
+        if e is None:
+            continue
+
+        res = connected_users[sid][1].wakeup_and_vad.predict(e)
+
+        if res is not None:
+            if 'start' in res:
+                print(f"Sid: {sid} Vad start")
+            elif 'cache_dialog' in res:
+                print(f"Sid: {sid} Vad end")
+                
+                # Save audio file
+                directory = './chat_history'
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
+                audio_duration = len(res["cache_dialog"]) / target_sample_rate
+
+                if audio_duration < 1:
+                    print("The duration of the audio is less than 1s, skipping...")
+                    continue
+
+                current_time = datetime.datetime.now()
+                timestamp = current_time.strftime("%Y%m%d_%H%M%S")
+                audio_filename = f"{directory}/test_dialog_{timestamp}.wav"
+                torchaudio.save(audio_filename, res["cache_dialog"].unsqueeze(0), target_sample_rate)
+
+                # Handle video frames if available
+                video_filename = None
+                if len(connected_users[sid][1].collected_images) > 0:
+                    video_filename = f"{directory}/test_video_{timestamp}.mp4"
+                    save_video(connected_users[sid][1].collected_images, video_filename)
+
+                # Create request for LLM processing
+                print("Start to generate response")
+                if video_filename:
+                    current_request = {
+                        "prompt": "<video><audio>",
+                        "multi_modal_data": {
+                            "video": [video_filename],
+                            "audio": [audio_filename],
+                        },
+                    }
+                else:
+                    current_request = {
+                        "prompt": "<audio>",
+                        "multi_modal_data": {
+                            "audio": [audio_filename],
+                        },
+                    }
+                
+                print(f"Start to put request into queue {current_request}")
+                request_inputs_queue.put(current_request)
+```
+
+##### 2. **Audio Processing Configuration**
+```python
+# File: web_demo/server.py:56-59
+decoder_topk = 2                    # TTS decoder top-k sampling
+codec_padding_size = 10             # TTS codec padding size
+target_sample_rate = 16000          # Target audio sample rate
+```
+
+##### 3. **VAD Processing Flow**
+
+1. **Audio Capture**: Real-time PCM audio data from client
+2. **Chunk Processing**: Audio processed in configurable chunk sizes
+3. **VAD Detection**: Voice activity detection using wakeup_and_vad system
+4. **Audio Caching**: Complete audio segments cached when speech ends
+5. **File Generation**: Audio saved as WAV files with timestamps
+6. **Request Creation**: Multimodal requests created for LLM processing
+
+##### 4. **Audio Quality Control**
+```python
+# File: web_demo/server.py:751-755
+audio_duration = len(res["cache_dialog"]) / target_sample_rate
+
+if audio_duration < 1:
+    print("The duration of the audio is less than 1s, skipping...")
+    continue
+```
+
+##### 5. **Video Frame Integration**
+```python
+# File: web_demo/server.py:763-765
+video_filename = None
+if len(connected_users[sid][1].collected_images) > 0:
+    video_filename = f"{directory}/test_video_{timestamp}.mp4"
+    save_video(connected_users[sid][1].collected_images, video_filename)
+```
+
+##### 6. **Key Features**
+
+- **Real-time Processing**: Continuous audio processing with minimal latency
+- **Voice Activity Detection**: Automatic detection of speech start/end
+- **Audio Quality Control**: Minimum duration requirements for processing
+- **Multimodal Integration**: Seamless integration of audio and video data
+- **File Management**: Automatic timestamped file generation
+- **Queue-based Processing**: Efficient request queuing for LLM processing
+
+This VAD system enables natural, hands-free interaction with the VITA model by automatically detecting when users start and stop speaking, creating a seamless conversational experience.
 
 ### 5. TTS Worker Process
 
@@ -1422,3 +2324,15 @@ atexit.register(cleanup_resources)
 **Last Updated**: January 2025  
 **Server Version**: 1.0  
 **Model Version**: VITA-1.5
+
+## 📝 Recent Updates
+
+This documentation has been significantly enhanced with detailed explanations of:
+
+- **LLM Generation Process**: Comprehensive breakdown of how `llm.generate` works with vLLM
+- **Model Output Collection**: Detailed explanation of character-by-character processing and streaming
+- **Tokenization System**: Complete coverage of multimodal token processing
+- **Conversation History Management**: Sophisticated context preservation system
+- **Voice Activity Detection**: Real-time audio processing and VAD implementation
+
+The documentation now provides complete technical details for developers working with the VITA web demo server implementation.

@@ -100,17 +100,21 @@ bash script/train/stage1_vision_language.sh \
 ### Stage 2: Audio-Language Training
 
 ```bash
-# Prepare audio-language data
-python data_tools/prepare_audio_language_data.py \
-    --input_dir /path/to/audio_language_data \
-    --output_dir /path/to/processed_audio_data
+# Download required weights
+# 1. VITA-1.5 checkpoint: https://huggingface.co/VITA-MLLM/VITA-1.5/tree/main
+# 2. InternViT-300M-448px: https://huggingface.co/OpenGVLab/InternViT-300M-448px
+# 3. Audio encoder: https://huggingface.co/VITA-MLLM/VITA-1.5/tree/main/audio-encoder-Qwen2-7B-1107-weight-base-11wh-tunning
+
+# Replace paths in script/train/finetuneTaskNeg_qwen_nodes.sh:
+# --model_name_or_path VITA1.5_ckpt
+# --vision_tower InternViT-300M-448px
+# --audio_encoder audio-encoder-Qwen2-7B-1107-weight-base-11wh-tunning
 
 # Start training
-bash script/train/stage2_audio_language.sh \
-    --data_path /path/to/processed_audio_data \
-    --vision_language_ckpt /path/to/stage1_output \
-    --output_dir /path/to/stage2_output \
-    --num_gpus 8
+export PYTHONPATH=./
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+OUTPUT_DIR=/mnt/cfs/lhj/videomllm_ckpt/outputs/vita_video_audio
+bash script/train/finetuneTaskNeg_qwen_nodes.sh ${OUTPUT_DIR}
 ```
 
 ### Stage 3: End-to-End Training
@@ -263,21 +267,49 @@ writer.add_histogram('Model/Weights', model.parameters(), step)
 ```json
 [
     {
-        "id": "multimodal_001",
-        "image": "path/to/image.jpg",
-        "audio": "path/to/audio.wav",
+        "set": "sharegpt4",
+        "id": "000000000164",
         "conversations": [
             {
                 "from": "human",
-                "value": "<image>\n<audio>\nBased on the image and audio, what's happening?"
+                "value": "<image>\n<audio>\n"
             },
             {
                 "from": "gpt",
-                "value": "Based on the image showing a kitchen and the audio of cooking sounds..."
+                "value": "This is a well-organized kitchen with a clean, modern aesthetic. The kitchen features a white countertop against a white wall, creating a bright and airy atmosphere."
             }
+        ],
+        "image": "coco/images/train2017/000000000164.jpg",
+        "audio": [
+            "new_value_dict_0717/output_wavs/f61cf238b7872b4903e1fc15dcb5a50c.wav"
         ]
     }
 ]
+```
+
+### Data Configuration
+
+Add the data class configuration in `vita/config/__init__.py`:
+
+```python
+from .dataset_config import *
+
+NaturalCap = [ShareGPT4V]
+
+DataConfig = {
+    "Pretrain_video": NaturalCap,
+}
+```
+
+Update `vita/config/dataset_config.py`:
+
+```python
+AudioFolder = ""
+FolderDict = {
+    "sharegpt4": "",
+}
+
+ShareGPT4V = {"chat_path": ""}
 ```
 
 ### Data Processing Pipeline

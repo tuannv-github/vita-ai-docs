@@ -41,6 +41,15 @@ Complete evaluation documentation including:
 - Performance metrics
 - Results interpretation
 
+### 🏗️ [MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md) - Model Architecture Guide
+Comprehensive model architecture documentation including:
+- Core architecture overview
+- Language model implementations
+- Multimodal integration
+- Model configuration
+- Performance characteristics
+- Usage examples
+
 ### 🛠 [DEVELOPMENT.md](DEVELOPMENT.md) - Development Guide
 Development-focused documentation covering:
 - Development setup
@@ -50,6 +59,27 @@ Development-focused documentation covering:
 - Model architecture
 - Contributing guidelines
 - Testing and debugging
+
+### 🔄 [RETRAINING_GUIDE.md](RETRAINING_GUIDE.md) - Model Retraining Guide
+Comprehensive guide for retraining VITA models including:
+- Complete training pipeline architecture
+- Progressive training strategy (3-stage approach)
+- Data preparation and configuration
+- Training scripts and parameters
+- Distributed training setup
+- Monitoring and logging
+- Troubleshooting and best practices
+- Custom dataset integration
+
+### 💻 [TRAINING_CODE_DOCUMENTATION.md](TRAINING_CODE_DOCUMENTATION.md) - Training Code Documentation
+Detailed explanation of VITA training codebase including:
+- Main training script (`train.py`) analysis
+- Custom trainer (`vita_trainer.py`) implementation
+- Data utilities and processing pipeline
+- Model arguments and configuration
+- Training loop and checkpointing
+- Code flow diagrams and function reference
+- Usage examples and customization
 
 ### 🏗 [ARCHITECTURE.md](ARCHITECTURE.md) - Source Code Architecture
 Comprehensive source code architecture documentation including:
@@ -144,6 +174,61 @@ Complete documentation of the VITA-1.5 web demo server implementation:
 - Session management and user handling
 - Performance optimization and deployment
 
+### 🎮 [DEMO_SH_DOCUMENTATION.md](DEMO_SH_DOCUMENTATION.md) - Demo Script Documentation
+Comprehensive documentation of the VITA demo.sh script including:
+- Complete script analysis and parameter explanation
+- Detailed implementation breakdown of video_audio_demo.py
+- Dynamic preprocessing algorithm for image patches
+- Token generation and conversation template processing
+- Model loading and inference pipeline
+- Performance metrics and memory usage analysis
+- Troubleshooting and customization options
+
+### 🏗️ [VITA_DEMO_ARCHITECTURE_DIAGRAM.md](VITA_DEMO_ARCHITECTURE_DIAGRAM.md) - Demo Architecture Diagrams
+Visual architecture and execution flow diagrams including:
+- System architecture overview with component relationships
+- Complete execution pipeline from script to output
+- Model architecture with vision/whale/language components
+- Data flow pipeline with tensor transformations
+- Performance characteristics and memory breakdown
+- Technical insights and implementation details
+
+### 🔍 [VITA_GENERATE_INTERNAL_TRACE.md](VITA_GENERATE_INTERNAL_TRACE.md) - Internal Generation Trace
+Detailed internal execution trace of the VITA model.generate() function:
+- Step-by-step trace from input to output
+- Multimodal input processing and token replacement
+- Generation loop execution with forward passes
+- Data transformations and memory usage
+- Performance bottlenecks and optimization points
+- Complete internal flow documentation
+
+### 🎣 [VITA_GENERATION_HOOKS.md](VITA_GENERATION_HOOKS.md) - Generation Hooks Guide
+Comprehensive guide for implementing generation hooks including:
+- PyTorch module hooks for deep introspection
+- VITA-specific hooks for vision/whale/language components
+- Activation monitoring and attention visualization
+- Memory usage tracking and performance analysis
+- Custom logic injection and debugging support
+- Advanced hook management and cleanup
+
+### 📊 [VITA_GENERATION_TRACING.md](VITA_GENERATION_TRACING.md) - Generation Tracing Guide
+Complete guide for generation tracing and monitoring including:
+- Execution tracing with complete flow capture
+- Data flow and performance tracing
+- VITA-specific generation analysis
+- Token generation pattern analysis
+- Memory and timing profiling
+- Debugging and optimization support
+
+### 🔄 [VITA_MODEL_GENERATE_CALLBACKS.md](VITA_MODEL_GENERATE_CALLBACKS.md) - Generation Callbacks Guide
+Detailed guide for implementing generation callbacks including:
+- TextStreamer for real-time output
+- Custom generation loops with callback support
+- Iterator streamer for async processing
+- Model wrapper with callback management
+- Performance monitoring and logging callbacks
+- Web application integration examples
+
 
 ## 🎯 Quick Navigation
 
@@ -158,17 +243,33 @@ Complete documentation of the VITA-1.5 web demo server implementation:
 3. Use [USAGE_GUIDE.md](USAGE_GUIDE.md) for API reference
 
 ### For Developers
-1. Read [DEVELOPMENT.md](DEVELOPMENT.md) for development setup
-2. Study [ARCHITECTURE.md](ARCHITECTURE.md) for code structure
-3. Review [MODEL_INFERENCE_PIPELINE.md](MODEL_INFERENCE_PIPELINE.md) for pipeline understanding
-4. Check [WEB_DEMO_SERVER.md](WEB_DEMO_SERVER.md) for server implementation
-5. Follow contributing guidelines in [DEVELOPMENT.md](DEVELOPMENT.md)
-6. Use [USAGE_GUIDE.md](USAGE_GUIDE.md) for integration examples
+1. Read [MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md) for model architecture and implementations
+2. Read [DEVELOPMENT.md](DEVELOPMENT.md) for development setup
+3. Study [ARCHITECTURE.md](ARCHITECTURE.md) for code structure
+4. Review [MODEL_INFERENCE_PIPELINE.md](MODEL_INFERENCE_PIPELINE.md) for pipeline understanding
+5. Check [WEB_DEMO_SERVER.md](WEB_DEMO_SERVER.md) for server implementation
+6. Follow contributing guidelines in [DEVELOPMENT.md](DEVELOPMENT.md)
+7. Use [USAGE_GUIDE.md](USAGE_GUIDE.md) for integration examples
+8. Consult [RETRAINING_GUIDE.md](RETRAINING_GUIDE.md) for model retraining
+9. Study [TRAINING_CODE_DOCUMENTATION.md](TRAINING_CODE_DOCUMENTATION.md) for code understanding
+10. Review [DEMO_SH_DOCUMENTATION.md](DEMO_SH_DOCUMENTATION.md) for demo implementation
+11. Study [VITA_GENERATE_INTERNAL_TRACE.md](VITA_GENERATE_INTERNAL_TRACE.md) for generation internals
+12. Use [VITA_GENERATION_HOOKS.md](VITA_GENERATION_HOOKS.md) for debugging and monitoring
+13. Check [VITA_GENERATION_TRACING.md](VITA_GENERATION_TRACING.md) for performance analysis
+14. Review [VITA_MODEL_GENERATE_CALLBACKS.md](VITA_MODEL_GENERATE_CALLBACKS.md) for callback implementation
 
 ### For Evaluators
 1. Start with [EVALUATION.md](EVALUATION.md) for benchmark setup
 2. Use [INSTALLATION.md](INSTALLATION.md) for environment setup
 3. Follow [USAGE_GUIDE.md](USAGE_GUIDE.md) for model usage
+
+### For Advanced Users & Researchers
+1. Study [VITA_GENERATE_INTERNAL_TRACE.md](VITA_GENERATE_INTERNAL_TRACE.md) for complete generation flow
+2. Review [VITA_DEMO_ARCHITECTURE_DIAGRAM.md](VITA_DEMO_ARCHITECTURE_DIAGRAM.md) for visual understanding
+3. Use [VITA_GENERATION_HOOKS.md](VITA_GENERATION_HOOKS.md) for deep model introspection
+4. Check [VITA_GENERATION_TRACING.md](VITA_GENERATION_TRACING.md) for performance analysis
+5. Review [VITA_MODEL_GENERATE_CALLBACKS.md](VITA_MODEL_GENERATE_CALLBACKS.md) for custom monitoring
+6. Study [DEMO_SH_DOCUMENTATION.md](DEMO_SH_DOCUMENTATION.md) for implementation details
 
 ## 🔗 External Resources
 
@@ -255,15 +356,25 @@ We welcome contributions to improve the documentation:
 - **v1.7**: Added detailed encoder layer and projection layer documentation
 - **v1.8**: Added comprehensive network architecture documentation for all ML components
 - **v1.9**: Added detailed language model layer documentation with input/output examples
+- **v1.10**: Updated with latest VITA-1.5 features, ModelScope integration, and VLMEvalKit support
+- **v1.11**: Added comprehensive model retraining guide with progressive training strategy
+- **v1.12**: Added detailed training code documentation with code analysis and examples
+- **v1.13**: Added comprehensive model architecture documentation with all language model implementations
 
 ### Model Versions
 - **VITA-1.0**: First open-source interactive omni multimodal LLM
 - **VITA-1.5**: Enhanced version with improved performance and reduced latency
+
+### Recent Updates
+- **2025.01.17**: ModelScope has supported VITA-1.5! Try the [Basic Demo](https://modelscope.cn/studios/modelscope/VITA1.5_demo)
+- **2025.01.06**: [VLMEvalKit](https://github.com/open-compass/VLMEvalKit) of OpenCompass has supported both VITA-1.5 and VITA-1.0 models
+- **2025.01.06**: The [technical report](https://huggingface.co/VITA-MLLM) of VITA-1.5 has been released
+- **2024.12.20**: VITA-1.5 introduced with significantly reduced interaction latency and enhanced multimodal performance
 
 ---
 
 **Note**: This documentation is actively maintained and updated. For the latest information, always refer to the most recent version of the documentation files.
 
 **Last Updated**: January 2025  
-**Documentation Version**: 1.5  
+**Documentation Version**: 1.13  
 **Model Version**: VITA-1.5

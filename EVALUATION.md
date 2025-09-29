@@ -92,10 +92,12 @@ echo "OPENAI_API_KEY=sk-your-api-key" > .env
 
 #### Option 2: Local Judge Model
 
+If OpenAI API is not available, you can use a local model as judge. In experiments, [Qwen1.5-1.8B-Chat](https://huggingface.co/Qwen/Qwen1.5-1.8B-Chat) works well compared to GPT-4, except in MM-Vet:
+
 ```bash
 # Start local judge server
 CUDA_VISIBLE_DEVICES=0 lmdeploy serve api_server \
-    /path/to/Qwen1.5-1.8B-Chat \
+    /mnt/cfs/lhj/model_weights/Qwen1.5-1.8B-Chat \
     --server-port 23333
 
 # Configure .env file
@@ -235,13 +237,13 @@ NAMES=(lyd jyg wzh wzz zcy by dyh lfy)  # evaluator names
 for((i=0; i<${#NAMES[@]}; i++)) 
 do
     CUDA_VISIBLE_DEVICES=6 python yt_video_inference_qa_imgs.py \
-        --model-path /path/to/vita-1.5 \
+        --model-path [vita/path] \
         --model_type qwen2p5_instruct \
         --conv_mode qwen2p5_instruct \
         --responsible_man ${NAMES[i]} \
         --video_type $VIDEO_TYPE \
         --output_dir qa_wo_sub \
-        --video_dir /path/to/Video-MME-imgs | tee logs/infer_${NAMES[i]}.log
+        --video_dir [Video-MME-imgs] | tee logs/infer.log
 done
 ```
 
@@ -252,14 +254,14 @@ done
 for((i=0; i<${#NAMES[@]}; i++)) 
 do
     CUDA_VISIBLE_DEVICES=7 python yt_video_inference_qa_imgs.py \
-        --model-path /path/to/vita-1.5 \
+        --model-path [vita/path] \
         --model_type qwen2p5_instruct \
         --conv_mode qwen2p5_instruct \
         --responsible_man ${NAMES[i]} \
         --video_type $VIDEO_TYPE \
         --output_dir qa_w_sub \
-        --video_dir /path/to/Video-MME-imgs \
-        --use_subtitles | tee logs/infer_sub_${NAMES[i]}.log
+        --video_dir [Video-MME-imgs] \
+        --use_subtitles | tee logs/infer.log
 done
 ```
 
